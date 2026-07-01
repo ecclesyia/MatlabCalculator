@@ -44,7 +44,8 @@ enum class CalculatorMode(val displayName: String) {
     SCIENTIFIC("Scientific"),
     GRAPHING("Graphing"),
     PROGRAMMER("Programmer"),
-    DATE_CALCULATION("Date Calculation")
+    DATE_CALCULATION("Date Calculation"),
+    STATISTICS("Statistics")
 }
 
 data class HistoryEntry(
@@ -140,6 +141,7 @@ fun AppNavigationWrapper() {
             CalculatorMode.GRAPHING -> GraphingCalculatorScreen(onMenuClick)
             CalculatorMode.PROGRAMMER -> ProgrammerCalculatorScreen(onMenuClick)
             CalculatorMode.DATE_CALCULATION -> DateCalculationScreen(onMenuClick)
+            CalculatorMode.STATISTICS -> StatisticsScreen(onMenuClick)
         }
     }
 }
@@ -1027,6 +1029,211 @@ fun ScientificGrid(onKeyPress: (String) -> Unit) {
                             fontSize = if (isNumber) 22.sp else 16.sp,
                             fontWeight = if (isNumber || isOperator) FontWeight.Normal else FontWeight.Light
                         )
+                    }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// 6. STATISTICS SCREEN
+// -------------------------------------------------------------
+@Composable
+fun StatisticsScreen(onMenuClick: () -> Unit) {
+    var datasetInput: String by remember { mutableStateOf("") }
+    var scoreInput: String by remember { mutableStateOf("") }
+    var hypothesizedMeanInput: String by remember { mutableStateOf("") }
+
+    val dataset = remember(datasetInput) {
+        datasetInput.split(Regex("[\\s,;]+"))
+            .mapNotNull { it.toDoubleOrNull() }
+    }
+
+    val count = dataset.size
+    val mean = if (count > 0) dataset.average() else 0.0
+    val variance = if (count > 1) {
+        dataset.map { kotlin.math.pow(it - mean, 2.0) }.sum() / (count - 1)
+    } else 0.0
+    val stdDev = if (variance > 0.0) kotlin.math.sqrt(variance) else 0.0
+
+    val zScore = remember(scoreInput, mean, stdDev) {
+        val x = scoreInput.toDoubleOrNull()
+        if (x != null && stdDev > 0.0) (x - mean) / stdDev else null
+    }
+
+    val tScore = remember(zScore) {
+        if (zScore != null) 50.0 + 10.0 * zScore else null
+    }
+
+    val tStatistic = remember(hypothesizedMeanInput, mean, stdDev, count) {
+        val mu0 = hypothesizedMeanInput.toDoubleOrNull()
+        if (mu0 != null && stdDev > 0.0 && count > 0) {
+            (mean - mu0) / (stdDev / kotlin.math.sqrt(count.toDouble()))
+        } else null
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF202020))
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Statistics", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. Data Input Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Dataset Input", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        TextField(
+                            value = datasetInput,
+                            onValueChange = { datasetInput = it },
+                            placeholder = { Text("e.g. 10, 12, 23, 23, 16, 23", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF2C2C2C),
+                                unfocusedContainerColor = Color(0xFF2C2C2C),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        if (count > 0) {
+                            Text("Successfully parsed $count values.", color = Color(0xFF56D364), fontSize = 12.sp)
+                        } else if (datasetInput.isNotEmpty()) {
+                            Text("Waiting for valid numbers...", color = Color(0xFFFF7B72), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // 2. Summary Statistics Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Dataset Metrics", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Count (N):", color = Color.White)
+                            Text("$count", color = Color(0xFF58A6FF), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Mean (x̄):", color = Color.White)
+                            Text(if (count > 0) String.format(Locale.US, "%.4f", mean) else "-", color = Color(0xFF58A6FF), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Variance / Deviance (s²):", color = Color.White)
+                            Text(if (count > 1) String.format(Locale.US, "%.4f", variance) else "-", color = Color(0xFF58A6FF), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Std Deviation (s):", color = Color.White)
+                            Text(if (count > 1) String.format(Locale.US, "%.4f", stdDev) else "-", color = Color(0xFF58A6FF), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 3. Z-Score and T-Score Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Score Calculator (Z-Value & T-Value)", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Enter a raw value (x) to compute its Z-score and T-score relative to the dataset:", color = Color.LightGray, fontSize = 12.sp)
+                        
+                        TextField(
+                            value = scoreInput,
+                            onValueChange = { scoreInput = it },
+                            placeholder = { Text("e.g. 15", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF2C2C2C),
+                                unfocusedContainerColor = Color(0xFF2C2C2C),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Z-Score (Z-value):", color = Color.White)
+                            Text(zScore?.let { String.format(Locale.US, "%.4f", it) } ?: "-", color = Color(0xFF56D364), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("T-Score (T-value):", color = Color.White)
+                            Text(tScore?.let { String.format(Locale.US, "%.4f", it) } ?: "-", color = Color(0xFF56D364), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 4. t-Statistic Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Hypothesis Testing (t-Statistic)", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Enter hypothesized population mean (μ₀) to calculate sample t-value:", color = Color.LightGray, fontSize = 12.sp)
+                        
+                        TextField(
+                            value = hypothesizedMeanInput,
+                            onValueChange = { hypothesizedMeanInput = it },
+                            placeholder = { Text("e.g. 12", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF2C2C2C),
+                                unfocusedContainerColor = Color(0xFF2C2C2C),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("t-Value (t-statistic):", color = Color.White)
+                            Text(tStatistic?.let { String.format(Locale.US, "%.4f", it) } ?: "-", color = Color(0xFF56D364), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
